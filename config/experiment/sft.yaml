@@ -1,0 +1,17 @@
+# @package _global_
+
+wandb:
+  group: "sft"
+  log: true
+
+seed: 1
+model_pars:
+  model_dir: ""
+  hf_model_id: "Qwen/Qwen3-4B-Instruct-2507"
+  hf_tokenizer_id: "Qwen/Qwen3-4B-Instruct-2507"
+
+resume: false
+method: "SFT"
+
+dataset_pars:
+  apply_chat_template: true

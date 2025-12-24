@@ -1,0 +1,71 @@
+hydra:
+  run:
+    dir: .
+  sweep:
+    dir: .
+    subdir: .
+  job_logging:
+    root:
+      level: INFO
+
+wandb:
+  entity: "ucl-dark"
+  project: llmtraining
+  group: ???
+  log: true
+
+debug: false
+save_dir: "exp/${model_pars.hf_model_id}/"
+
+# Experiment parameters
+seed: 1
+resume: false
+
+model_pars:
+  model_dir: ""
+  hf_model_id: ???  # Qwen or llama "meta-llama/Llama-3.2-1B-Instruct"
+  hf_tokenizer_id: ???
+
+dataset_pars:
+  apply_chat_template: true
+
+# FT parameters
+finetuning_pars:
+  save_total_limit: 10
+  num_train_epochs: 1
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 1
+  reference_learning_rate: 1e-6
+  lr_scheduler_type: "linear"
+  save_n_per_epoch: 1
+  log_n_per_epoch: 10
+  eval_n_per_epoch: 1
+  optimiser: "adamw_torch_fused"
+  bf16: true
+  fp16: false
+  deepspeed: ""
+  fsdp: ""
+  packing: false
+  ddp_find_unused_parameters: false
+  ddp_static_graph: true
+  label_smoothing_factor: 0.0
+  warmup_ratio: 0.0
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  dataloader_num_workers: 1
+  dataloader_prefetch_factor: 4
+  dataloader_pin_memory: true
+  dataloader_persistent_workers: true
+  gradient_checkpointing: false
+
+eval_pars:
+  num_workers: 1
+  pass_at_k: 16
+  batch_size: 32
+  num_samples: 32
+  max_tokens: 1024
+  temperature: 0.8
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  data_parallel_size: 1
+  gpu_memory_utilization: 0.92
