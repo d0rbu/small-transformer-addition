@@ -11,6 +11,7 @@ hydra:
 wandb:
   entity: "d0rb"
   project: "sta"
+  group: "scratch"
   log: true
 
 debug: false
@@ -22,8 +23,8 @@ resume: false
 
 model_pars:
   model_dir: ""
-  hf_model_id: "EleutherAI/pythia-70m"  # Qwen or llama "meta-llama/Llama-3.2-1B-Instruct"
-  hf_tokenizer_id: "EleutherAI/pythia-70m"
+  hf_model_id: "Qwen/Qwen3-4B-Instruct-2507"
+  hf_tokenizer_id: "Qwen/Qwen3-4B-Instruct-2507"
 
 dataset_pars:
   apply_chat_template: true

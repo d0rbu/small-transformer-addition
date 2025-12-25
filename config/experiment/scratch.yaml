@@ -1,14 +1,18 @@
 # @package _global_
 
 wandb:
-  group: "sft"
+  group: "scratch"
   log: true
 
 seed: 1
 model_pars:
   model_dir: ""
-  hf_model_id: "EleutherAI/pythia-70m"
-  hf_tokenizer_id: "EleutherAI/pythia-70m"
+  hf_model_id: "Qwen/Qwen3-4B-Instruct-2507"
+  hf_tokenizer_id: "Qwen/Qwen3-4B-Instruct-2507"
+  num_hidden_layers: 8
+  hidden_size: 512
+  num_attention_heads: 8
+  intermediate_size: 1024
 
 resume: false
 method: "scratch"
