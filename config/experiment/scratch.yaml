@@ -7,8 +7,8 @@ wandb:
 seed: 1
 model_pars:
   model_dir: ""
-  hf_model_id: "openai-community/gpt2-medium"
-  hf_tokenizer_id: "openai-community/gpt2-medium"
+  hf_model_id: "EleutherAI/pythia-70m"
+  hf_tokenizer_id: "EleutherAI/pythia-70m"
 
 resume: false
 method: "scratch"
