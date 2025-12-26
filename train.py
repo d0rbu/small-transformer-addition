@@ -16,7 +16,7 @@ from transformers import (
 from trl import SFTConfig, SFTTrainer
 
 import wandb
-from src.dataset import get_addition_datasets
+from src.dataset import get_addition_datasets, get_addition_eval_dataset_uniform
 from src.helpers import log_config
 from src.huggingface_callbacks import (
     GreedyDecodeOnce,
@@ -185,6 +185,7 @@ def main(args):
             num_hidden_layers=args.model_pars.num_hidden_layers,
             hidden_size=args.model_pars.hidden_size,
             num_attention_heads=args.model_pars.num_attention_heads,
+            num_key_value_heads=args.model_pars.num_key_value_heads,
             intermediate_size=args.model_pars.intermediate_size,
         )
         config.vocab_size = len(tokenizer)
@@ -232,9 +233,12 @@ def main(args):
             continue
 
         # sample 1000 data points for length generalization evaluation
-        len_eval_dataset = get_addition_datasets(
-            args, tokenizer, k=num_digits, train_ratio=-1000
-        )[1]
+        logging.info(
+            f"Sampling 1000 data points for length generalization evaluation with {num_digits} digits."
+        )
+        len_eval_dataset = get_addition_eval_dataset_uniform(
+            args, tokenizer, k=num_digits, num_samples=1000
+        )
         len_eval_greedy_evaluation = GreedyEvaluation(
             trainer,
             tokenizer,

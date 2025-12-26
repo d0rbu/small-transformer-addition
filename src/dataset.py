@@ -207,6 +207,16 @@ class AdditionDataset:
 
         return formatted_pairs
 
+    def generate_eval_data_uniform(self, num_samples: int) -> Dataset:
+        all_pairs = self._get_all_pairs()
+        num_pairs = all_pairs.shape[0]
+
+        random_shuffle = th.randperm(num_pairs)
+        shuffled_pairs = all_pairs[random_shuffle]
+        eval_pairs = shuffled_pairs[:num_samples]
+
+        return Dataset.from_list(self._format_pairs(eval_pairs))
+
     def generate_data(self, train_ratio: int | float = 0.8) -> tuple[Dataset, Dataset]:
         train_pairs, test_pairs = self._uniform_split_pairs(self.seed, train_ratio)
 
@@ -245,4 +255,12 @@ def get_addition_datasets(
 ) -> tuple[Dataset, Dataset]:
     return AdditionDataset(args.seed, tokenizer, k=k).generate_data(
         train_ratio=train_ratio
+    )
+
+
+def get_addition_eval_dataset_uniform(
+    args, tokenizer, k: int = 4, num_samples: int = 1000
+) -> Dataset:
+    return AdditionDataset(args.seed, tokenizer, k=k).generate_eval_data_uniform(
+        num_samples
     )
