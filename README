@@ -1,26 +1,11 @@
 # Quick start
 
-## Training env
-```bash
-ENVNAME=venvname
-uv venv $ENVNAME --python 3.10
-source $ENVNAME/bin/activate
-uv pip install torch --index-url https://download.pytorch.org/whl/cu124
-uv pip install transformers[torch] datasets tokenizers peft accelerate trl wandb hydra-core
+## Training
 
+```bash
+uv sync
 hf auth login
 wandb login
-```
 
-## Inference env
-trl breaks if vllm is installed, so make a separate env.
-```bash
-ENVNAME=venvname
-uv venv $ENVNAME --python 3.12
-source $ENVNAME/bin/activate
-uv pip install torch --index-url https://download.pytorch.org/whl/cu124
-uv pip install transformers[torch] datasets tokenizers peft accelerate wandb hydra-core
-uv pip install vllm --torch-backend=auto
-hf auth login
-wandb login
+uv run python train.py +experiment=scratch
 ```
