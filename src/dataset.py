@@ -1,5 +1,9 @@
+from copy import deepcopy
+
 import regex
+import torch as th
 from datasets import Dataset
+from tqdm import tqdm
 
 from src.helpers import compute_pass_at_k
 
@@ -107,44 +111,135 @@ class FinetuningDataset:
         train_dataset = Dataset.from_dict(messages)
         train_dataset = train_dataset.shuffle(seed=self.seed)
         test_dataset = Dataset.from_dict(messages)
-        if self.apply_chat_template:
-            train_dataset = train_dataset.map(
-                lambda x: {
-                    "prompt": self.tokenizer.apply_chat_template(
-                        [x["chat"][0]], tokenize=False, add_generation_prompt=False
-                    ),
-                    "completion": self.tokenizer.apply_chat_template(
-                        [x["chat"][1]], tokenize=False, add_generation_prompt=True
-                    ),
-                }
-            )
-            test_dataset = test_dataset.map(
-                lambda x: {
-                    "prompt": self.tokenizer.apply_chat_template(
-                        [x["chat"][0]], tokenize=False, add_generation_prompt=False
-                    ),
-                    "completion": self.tokenizer.apply_chat_template(
-                        [x["chat"][1]], tokenize=False, add_generation_prompt=True
-                    ),
-                }
-            )
-        else:
-            train_dataset = train_dataset.map(
-                lambda x: {
-                    "prompt": x["chat"][0]["content"],
-                    "completion": x["chat"][1]["content"],
-                }
-            )
-            test_dataset = test_dataset.map(
-                lambda x: {
-                    "prompt": x["chat"][0]["content"],
-                    "completion": x["chat"][1]["content"],
-                }
-            )
+
+        train_dataset = train_dataset.map(
+            lambda x: {
+                "prompt": x["chat"][0]["content"],
+                "completion": x["chat"][1]["content"],
+            }
+        )
+        test_dataset = test_dataset.map(
+            lambda x: {
+                "prompt": x["chat"][0]["content"],
+                "completion": x["chat"][1]["content"],
+            }
+        )
+
         return train_dataset, test_dataset
 
 
-def get_datasets(args, tokenizer) -> tuple[Dataset, Dataset]:
+def get_finetuning_datasets(args, tokenizer) -> tuple[Dataset, Dataset]:
     return FinetuningDataset(
         args.seed, tokenizer, args.dataset_pars.apply_chat_template
     ).generate_data()
+
+
+class AdditionDataset:
+    def __init__(self, seed, tokenizer, k: int = 3):
+        self.tokenizer = tokenizer
+        self.seed = seed
+        self.k = k
+
+    def _get_all_pairs(self) -> th.Tensor:
+        start = 10 ** (self.k - 1)
+        end = 10**self.k
+        all_numbers = th.arange(start, end)
+
+        pairs = th.combinations(all_numbers, 2, with_replacement=True)
+
+        return pairs
+
+    def _uniform_split_pairs(
+        self, seed: int, train_ratio: float
+    ) -> tuple[th.Tensor, th.Tensor]:
+        th.manual_seed(seed)
+
+        all_pairs = self._get_all_pairs()
+        num_pairs = all_pairs.shape[0]
+        num_train_pairs = int(num_pairs * train_ratio)
+
+        random_shuffle = th.randperm(num_pairs)
+        shuffled_pairs = all_pairs[random_shuffle]
+
+        train_pairs = shuffled_pairs[:num_train_pairs]
+        test_pairs = shuffled_pairs[num_train_pairs:]
+
+        return train_pairs, test_pairs
+
+    def _format_solution(
+        self, summands: th.Tensor, solution: th.Tensor, leading_zeroes: int = 0
+    ) -> dict[str, str]:
+        first_summand = "0" * leading_zeroes + str(summands[0].item())
+        second_summand = "0" * leading_zeroes + str(summands[1].item())
+        solution_digits = str(solution.item())
+
+        prompt_parts = []
+        for first_summand_digit, second_summand_digit in zip(
+            reversed(first_summand), reversed(second_summand)
+        ):
+            prompt_parts.append(f"{first_summand_digit} {second_summand_digit}|")
+
+        prompt_parts.append("=")
+
+        prompt = "".join(prompt_parts)
+        solution = "".join(reversed(solution_digits))
+
+        return {
+            "prompt": prompt,
+            "completion": solution,
+        }
+
+    def _format_pairs(self, pairs: th.Tensor) -> list[dict]:
+        solutions = pairs.sum(dim=1)
+        dataset_iterator = tqdm(
+            zip(pairs, solutions),
+            total=pairs.shape[0],
+            desc="Formatting pairs",
+            leave=False,
+        )
+
+        formatted_pairs = [
+            self._format_solution(pair, solution) for pair, solution in dataset_iterator
+        ]
+
+        return formatted_pairs
+
+    def generate_data(self, train_ratio: float = 0.8) -> tuple[Dataset, Dataset]:
+        train_pairs, test_pairs = self._uniform_split_pairs(self.seed, train_ratio)
+
+        train_dataset = Dataset.from_list(self._format_pairs(train_pairs))
+        test_dataset = Dataset.from_list(self._format_pairs(test_pairs))
+
+        return train_dataset, test_dataset
+
+    def eval_outputs(self, outputs: list[dict]) -> tuple[float, int, list[dict]]:
+        num_correct: int = 0
+
+        modified_outputs = deepcopy(outputs)
+
+        for output in tqdm(
+            modified_outputs,
+            total=len(outputs),
+            desc="Evaluating outputs",
+            leave=False,
+        ):
+            assert "prediction" in output, "Prediction is required"
+            assert "completion" in output, "Completion is required"
+
+            prediction = output["prediction"]
+            ground_truth = output["completion"]
+
+            correct = prediction == ground_truth
+            num_correct += correct
+            output["correct"] = correct
+
+        accuracy = num_correct / len(outputs)
+        return accuracy, num_correct, modified_outputs
+
+
+def get_addition_datasets(
+    args, tokenizer, k: int = 3, train_ratio: float = 0.8
+) -> tuple[Dataset, Dataset]:
+    return AdditionDataset(args.seed, tokenizer, k=k).generate_data(
+        train_ratio=train_ratio
+    )
