@@ -9,10 +9,10 @@ model_pars:
   model_dir: ""
   hf_model_id: "Qwen/Qwen3-4B-Instruct-2507"
   hf_tokenizer_id: "Qwen/Qwen3-4B-Instruct-2507"
-  num_hidden_layers: 4
-  hidden_size: 256
-  num_attention_heads: 4
-  intermediate_size: 512
+  num_hidden_layers: 8
+  hidden_size: 512
+  num_attention_heads: 8
+  intermediate_size: 1024
 
 resume: false
 method: "scratch"

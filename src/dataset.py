@@ -135,7 +135,7 @@ def get_finetuning_datasets(args, tokenizer) -> tuple[Dataset, Dataset]:
 
 
 class AdditionDataset:
-    def __init__(self, seed, tokenizer, k: int = 3):
+    def __init__(self, seed, tokenizer, k: int = 4):
         self.tokenizer = tokenizer
         self.seed = seed
         self.k = k
@@ -150,13 +150,16 @@ class AdditionDataset:
         return pairs
 
     def _uniform_split_pairs(
-        self, seed: int, train_ratio: float
+        self, seed: int, train_ratio: int | float
     ) -> tuple[th.Tensor, th.Tensor]:
         th.manual_seed(seed)
 
         all_pairs = self._get_all_pairs()
         num_pairs = all_pairs.shape[0]
-        num_train_pairs = int(num_pairs * train_ratio)
+        if isinstance(train_ratio, float):
+            num_train_pairs = int(num_pairs * train_ratio)
+        else:
+            num_train_pairs = train_ratio
 
         random_shuffle = th.randperm(num_pairs)
         shuffled_pairs = all_pairs[random_shuffle]
@@ -177,12 +180,12 @@ class AdditionDataset:
         for first_summand_digit, second_summand_digit in zip(
             reversed(first_summand), reversed(second_summand)
         ):
-            prompt_parts.append(f"{first_summand_digit} {second_summand_digit}|")
+            prompt_parts.append(f"{first_summand_digit}+{second_summand_digit}|")
 
         prompt_parts.append("=")
 
         prompt = "".join(prompt_parts)
-        solution = "".join(reversed(solution_digits))
+        solution = "|".join(reversed(solution_digits)) + "|"
 
         return {
             "prompt": prompt,
@@ -204,7 +207,7 @@ class AdditionDataset:
 
         return formatted_pairs
 
-    def generate_data(self, train_ratio: float = 0.8) -> tuple[Dataset, Dataset]:
+    def generate_data(self, train_ratio: int | float = 0.8) -> tuple[Dataset, Dataset]:
         train_pairs, test_pairs = self._uniform_split_pairs(self.seed, train_ratio)
 
         train_dataset = Dataset.from_list(self._format_pairs(train_pairs))
@@ -238,7 +241,7 @@ class AdditionDataset:
 
 
 def get_addition_datasets(
-    args, tokenizer, k: int = 3, train_ratio: float = 0.8
+    args, tokenizer, k: int = 4, train_ratio: int | float = 0.8
 ) -> tuple[Dataset, Dataset]:
     return AdditionDataset(args.seed, tokenizer, k=k).generate_data(
         train_ratio=train_ratio

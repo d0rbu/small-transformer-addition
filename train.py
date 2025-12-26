@@ -18,10 +18,14 @@ from trl import SFTConfig, SFTTrainer
 import wandb
 from src.dataset import get_addition_datasets
 from src.helpers import log_config
-from src.huggingface_callbacks import GreedyDecodeOnce, SaveCheckpointCallback
+from src.huggingface_callbacks import (
+    GreedyDecodeOnce,
+    GreedyEvaluation,
+    SaveCheckpointCallback,
+)
 
 
-def create_digit_tokenizer():
+def create_digit_tokenizer() -> PreTrainedTokenizerFast:
     """Create a minimal tokenizer with 14 tokens: 0-9, +, |, =, [PAD]"""
     vocab = {str(i): i for i in range(10)}  # 0-9 -> IDs 0-9
     vocab["+"] = 10
@@ -36,6 +40,7 @@ def create_digit_tokenizer():
     )
 
     tokenizer.add_special_tokens({"pad_token": "[PAD]", "eos_token": "[EOS]"})
+
     return tokenizer
 
 
@@ -108,7 +113,9 @@ def main(args):
         global_setup(args, wandb_run_id)
         tokenizer = AutoTokenizer.from_pretrained(args.model_pars.model_dir)
 
-    train_dataset, eval_dataset = get_addition_datasets(args, tokenizer)
+    train_dataset, eval_dataset = get_addition_datasets(
+        args, tokenizer, k=args.finetuning_pars.num_digits
+    )
 
     effective_batch_size = (
         args.finetuning_pars.per_device_train_batch_size
@@ -180,7 +187,7 @@ def main(args):
             num_attention_heads=args.model_pars.num_attention_heads,
             intermediate_size=args.model_pars.intermediate_size,
         )
-        config.vocab_size = len(tokenizer) - 1  # -1 for [PAD]
+        config.vocab_size = len(tokenizer)
         model = AutoModelForCausalLM.from_config(config)
         trainer = SFTTrainer(
             model=model,
@@ -204,11 +211,38 @@ def main(args):
         )
 
     check_greedy_decoding = GreedyDecodeOnce(
-        trainer, tokenizer, prompt="The quick brown fox", max_new_tokens=16
+        trainer, tokenizer, prompt="0+0|1+2|3+0|4+3|=", max_new_tokens=16
+    )
+    greedy_evaluation = GreedyEvaluation(
+        trainer,
+        tokenizer,
+        eval_dataset,
+        max_new_tokens=16,
     )
     save_checkpoint_callback = SaveCheckpointCallback(trainer)
     trainer.add_callback(check_greedy_decoding)
     trainer.add_callback(save_checkpoint_callback)
+    trainer.add_callback(greedy_evaluation)
+
+    # add length generalization evals
+    min_len_eval = max(args.finetuning_pars.num_digits - 2, 1)
+    max_len_eval = min(args.finetuning_pars.num_digits + 2, 5)
+    for num_digits in range(min_len_eval, max_len_eval + 1):
+        if num_digits == args.finetuning_pars.num_digits:
+            continue
+
+        # sample 1000 data points for length generalization evaluation
+        len_eval_dataset = get_addition_datasets(
+            args, tokenizer, k=num_digits, train_ratio=-1000
+        )[1]
+        len_eval_greedy_evaluation = GreedyEvaluation(
+            trainer,
+            tokenizer,
+            len_eval_dataset,
+            wandb_group=str(num_digits),
+            max_new_tokens=16,
+        )
+        trainer.add_callback(len_eval_greedy_evaluation)
 
     logging.info(
         f"Starting training on {args.model_pars.hf_model_id} using {args.method} (output dir {output_dir})."

@@ -9,10 +9,10 @@ model_pars:
   model_dir: ""
   hf_model_id: "Qwen/Qwen3-4B-Instruct-2507"
   hf_tokenizer_id: "Qwen/Qwen3-4B-Instruct-2507"
-  num_hidden_layers: 4
-  hidden_size: 256
-  num_attention_heads: 4
-  intermediate_size: 512
+  num_hidden_layers: 8
+  hidden_size: 512
+  num_attention_heads: 8
+  intermediate_size: 1024
 
 resume: false
 method: "scratch"
@@ -21,8 +21,8 @@ dataset_pars:
   apply_chat_template: false
 
 finetuning_pars:
-  per_device_train_batch_size: 2000
-  num_train_epochs: 10
+  per_device_train_batch_size: 500
+  num_train_epochs: 100
   reference_learning_rate: 1e-4
   weight_decay: 1e-4
   max_grad_norm: 1.0

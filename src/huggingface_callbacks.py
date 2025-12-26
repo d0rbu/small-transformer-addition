@@ -1,9 +1,12 @@
-from transformers import TrainerCallback
-import torch
-
 import logging
-import wandb
 import os
+
+import torch
+from datasets import Dataset
+from tqdm import tqdm
+from transformers import TrainerCallback
+
+import wandb
 
 
 class SaveCheckpointCallback(TrainerCallback):
@@ -14,20 +17,28 @@ class SaveCheckpointCallback(TrainerCallback):
 
     def on_save(self, args, state, control, **kwargs):
         logging.info(f"Saving checkpoint at step {state.global_step}.")
-        output_dir = os.path.join(args.output_dir, f"{self._checkpoint_prefix}{state.global_step}")
-        if getattr(wandb, "run", None) is not None and getattr(self, "_is_main_process", True): 
+        output_dir = os.path.join(
+            args.output_dir, f"{self._checkpoint_prefix}{state.global_step}"
+        )
+        if getattr(wandb, "run", None) is not None and getattr(
+            self, "_is_main_process", True
+        ):
             wandb.save(f"{output_dir}/pytorch_model.bin")
             wandb.log({"checkpoint": f"{self._checkpoint_prefix}{state.global_step}"})
         with open(os.path.join(output_dir, "wandb_run_id.txt"), "w") as f:
             f.write(wandb.run.id)
         logging.info(f"Saved checkpoint at step {state.global_step} to {output_dir}.")
         return control
-    
+
     def on_train_end(self, args, state, control, **kwargs):
         logging.info("Training ended.")
         logging.info(f"Saving checkpoint at step {state.global_step}.")
-        output_dir = os.path.join(args.output_dir, f"{self._checkpoint_prefix}{state.global_step}")
-        if getattr(wandb, "run", None) is not None and getattr(self, "_is_main_process", True): 
+        output_dir = os.path.join(
+            args.output_dir, f"{self._checkpoint_prefix}{state.global_step}"
+        )
+        if getattr(wandb, "run", None) is not None and getattr(
+            self, "_is_main_process", True
+        ):
             wandb.save(f"{output_dir}/pytorch_model.bin")
             wandb.log({"checkpoint": f"{self._checkpoint_prefix}{state.global_step}"})
         with open(os.path.join(output_dir, "wandb_run_id.txt"), "w") as f:
@@ -43,7 +54,10 @@ class GreedyDecodeOnce(TrainerCallback):
     - Uses use_cache=False to avoid KV/cache issues.
     - Keeps decode short (few tokens) to avoid memory spikes.
     """
-    def __init__(self, trainer, tokenizer, prompt="The quick brown fox", max_new_tokens=16):
+
+    def __init__(
+        self, trainer, tokenizer, prompt="0+0|1+2|3+0|4+3|=", max_new_tokens=16
+    ):
         self.trainer = trainer
         self.tok = tokenizer
         self.prompt = prompt
@@ -64,12 +78,20 @@ class GreedyDecodeOnce(TrainerCallback):
         self.done = True
 
         model = trainer.model
-        device = getattr(trainer.accelerator, "device", torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        device = getattr(
+            trainer.accelerator,
+            "device",
+            torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+        )
 
         enc = self.tok(self.prompt, return_tensors="pt")
         input_ids = enc["input_ids"].to(device)
         attn = enc.get("attention_mask")
-        attn = attn.to(device) if isinstance(attn, torch.Tensor) else torch.ones_like(input_ids, device=device)
+        attn = (
+            attn.to(device)
+            if isinstance(attn, torch.Tensor)
+            else torch.ones_like(input_ids, device=device)
+        )
 
         was_training = model.training
         model.eval()
@@ -104,4 +126,59 @@ class GreedyDecodeOnce(TrainerCallback):
     def on_train_begin(self, args, state, control, **kw):
         tr = getattr(self, "trainer", None)
         self._run_once(tr)
+        return control
+
+
+class GreedyEvaluation(TrainerCallback):
+    def __init__(
+        self,
+        trainer,
+        tokenizer,
+        eval_dataset: Dataset,
+        wandb_group: str = "default",
+        max_new_tokens: int = 16,
+    ):
+        self.trainer = trainer
+        self.tokenizer = tokenizer
+        self.eval_dataset = eval_dataset
+        self.max_new_tokens = max_new_tokens
+        self.wandb_group = wandb_group
+
+    @torch.no_grad()
+    def greedy_decode(self, batch: list[str], max_new_tokens: int = 16) -> list[str]:
+        self.trainer.model.eval()
+
+        encoded_batch = self.tokenizer(batch, return_tensors="pt")
+        input_ids = encoded_batch["input_ids"]
+        attn = encoded_batch.get("attention_mask")
+        starting_length = input_ids.shape[1]
+
+        for _ in range(max_new_tokens):
+            out = self.trainer.model(
+                input_ids=input_ids, attention_mask=attn, use_cache=False
+            )
+            next_token = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+            input_ids = torch.cat([input_ids, next_token], dim=1)
+            # keep attention mask in lockstep
+            one = torch.ones_like(next_token, device=attn.device)
+            attn = torch.cat([attn, one], dim=1)
+
+        return self.tokenizer.batch_decode(
+            input_ids[:, starting_length:], skip_special_tokens=True
+        )
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        for batch in tqdm(self.eval_dataset, desc="Evaluating", leave=False):
+            predictions = self.greedy_decode(batch["prompt"], self.max_new_tokens)
+            completions = batch["completion"]
+
+            correct = [
+                prediction == completion
+                for prediction, completion in zip(predictions, completions, strict=True)
+            ]
+            accuracy = sum(correct) / len(correct)
+
+            logging.info(f"[Greedy Evaluation] accuracy: {accuracy}")
+            wandb.log({f"greedy_eval_acc_{self.wandb_group}": accuracy})
+
         return control
