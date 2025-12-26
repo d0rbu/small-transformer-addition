@@ -114,7 +114,7 @@ def main(args):
         tokenizer = AutoTokenizer.from_pretrained(args.model_pars.model_dir)
 
     train_dataset, eval_dataset = get_addition_datasets(
-        args, tokenizer, k=args.finetuning_pars.num_digits
+        args, tokenizer, k=args.dataset_pars.num_digits
     )
 
     effective_batch_size = (
@@ -225,10 +225,10 @@ def main(args):
     trainer.add_callback(greedy_evaluation)
 
     # add length generalization evals
-    min_len_eval = max(args.finetuning_pars.num_digits - 2, 1)
-    max_len_eval = min(args.finetuning_pars.num_digits + 2, 5)
+    min_len_eval = max(args.dataset_pars.num_digits - 2, 1)
+    max_len_eval = min(args.dataset_pars.num_digits + 2, 5)
     for num_digits in range(min_len_eval, max_len_eval + 1):
-        if num_digits == args.finetuning_pars.num_digits:
+        if num_digits == args.dataset_pars.num_digits:
             continue
 
         # sample 1000 data points for length generalization evaluation

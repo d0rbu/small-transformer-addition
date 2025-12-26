@@ -19,6 +19,7 @@ method: "scratch"
 
 dataset_pars:
   apply_chat_template: false
+  num_digits: 4
 
 finetuning_pars:
   per_device_train_batch_size: 2000
