@@ -264,7 +264,7 @@ def main(args):
             trainer,
             tokenizer,
             summand_num_eval_dataset,
-            wandb_group=str(num_operands),
+            wandb_group=f"{num_operands}ops",
             max_new_tokens=16,
         )
         trainer.add_callback(summand_num_eval_greedy_evaluation)

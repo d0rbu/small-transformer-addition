@@ -1,6 +1,5 @@
 import random
 from copy import deepcopy
-from math import comb
 
 import regex
 import torch as th
@@ -177,24 +176,18 @@ class AdditionDataset:
     def _format_solution(
         self, summands: th.Tensor, solution: th.Tensor, leading_zeroes: int = 0
     ) -> dict[str, str]:
-        # Convert all summands to strings with leading zeroes
         summand_strs = ["0" * leading_zeroes + str(s.item()) for s in summands]
         solution_digits = str(solution.item())
 
-        # Build prompt by iterating through digit positions (reversed for right-to-left)
         prompt_parts = []
-        max_len = max(len(s) for s in summand_strs)
-        # Pad all summands to same length
-        summand_strs = [s.zfill(max_len) for s in summand_strs]
 
-        for digit_pos in range(max_len - 1, -1, -1):
-            digits_at_pos = [s[digit_pos] for s in summand_strs]
+        for digits_at_pos in zip(*summand_strs, strict=True):
             prompt_parts.append("+".join(digits_at_pos) + "|")
 
         prompt_parts.append("=")
 
         prompt = "".join(prompt_parts)
-        solution = "|".join(reversed(solution_digits)) + "|"
+        solution = "|".join(solution_digits) + "|"
 
         return {
             "prompt": prompt,
@@ -217,31 +210,22 @@ class AdditionDataset:
 
         return formatted
 
+    # this is needed to more efficiently get eval data for larger k and num_samples
     def generate_eval_data_uniform(self, num_samples: int) -> Dataset:
         random.seed(self.seed)
         th.manual_seed(self.seed)
 
         start = 10 ** (self.k - 1)
         end = 10**self.k
-        n = end - start  # number of unique values
+        num_unique_values = end - start
 
-        # For num_operands items with replacement: C(n + r - 1, r) where r = num_operands
-        # This is the multiset coefficient=
-        total_combinations = comb(n + self.num_operands - 1, self.num_operands)
-
+        total_combinations = num_unique_values**self.num_operands
         num_samples_to_draw = min(num_samples, total_combinations)
 
-        # Sample random combinations uniformly
-        sampled_combinations = []
-        seen = set()
+        sampled_combinations = set()
         while len(sampled_combinations) < num_samples_to_draw:
-            # Generate a random combination with replacement (sorted for uniqueness)
-            combo = tuple(
-                sorted(random.choices(range(start, end), k=self.num_operands))
-            )
-            if combo not in seen:
-                seen.add(combo)
-                sampled_combinations.append(combo)
+            combo = tuple(random.choices(range(start, end), k=self.num_operands))
+            sampled_combinations.add(combo)
 
         eval_combinations = th.tensor(sampled_combinations)
 
