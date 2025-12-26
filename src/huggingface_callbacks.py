@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 
 import torch
 from datasets import Dataset
@@ -137,38 +138,72 @@ class GreedyEvaluation(TrainerCallback):
         eval_dataset: Dataset,
         wandb_group: str = "default",
         max_new_tokens: int = 16,
+        eval_batch_size: int = 1000,
     ):
         self.trainer = trainer
         self.tokenizer = tokenizer
         self.eval_dataset = eval_dataset
         self.max_new_tokens = max_new_tokens
         self.wandb_group = wandb_group
+        self.eval_batch_size = eval_batch_size
 
     @torch.no_grad()
     def greedy_decode(self, batch: list[str], max_new_tokens: int = 16) -> list[str]:
         self.trainer.model.eval()
 
         encoded_batch = self.tokenizer(batch, return_tensors="pt")
-        input_ids = encoded_batch["input_ids"]
-        attn = encoded_batch.get("attention_mask")
+        input_ids = encoded_batch["input_ids"].to(self.trainer.model.device)
+        attn = encoded_batch.get("attention_mask").to(input_ids.device)
         starting_length = input_ids.shape[1]
+        finished_samples = torch.zeros(
+            len(batch), dtype=torch.bool, device=input_ids.device
+        )
+        eos_token_id = self.tokenizer.eos_token_id
 
         for _ in range(max_new_tokens):
             out = self.trainer.model(
                 input_ids=input_ids, attention_mask=attn, use_cache=False
             )
             next_token = out.logits[:, -1, :].argmax(dim=-1, keepdim=True)
+
+            just_finished = next_token.squeeze(dim=-1) == eos_token_id
+            finished_samples |= just_finished
+
+            next_token[finished_samples] = eos_token_id
+
             input_ids = torch.cat([input_ids, next_token], dim=1)
             # keep attention mask in lockstep
             one = torch.ones_like(next_token, device=attn.device)
             attn = torch.cat([attn, one], dim=1)
 
-        return self.tokenizer.batch_decode(
+            if finished_samples.all():
+                break
+
+        raw_responses = self.tokenizer.batch_decode(
             input_ids[:, starting_length:], skip_special_tokens=True
         )
 
+        # because of the WordLevel tokenizer, the characters in the response are padded with spaces
+        responses_characters = [
+            response.split()
+            for response in tqdm(
+                raw_responses, desc="Splitting up response characters", leave=False
+            )
+        ]
+        responses = [
+            "".join(characters)
+            for characters in tqdm(
+                responses_characters, desc="Joining response characters", leave=False
+            )
+        ]
+        return responses
+
     def on_evaluate(self, args, state, control, **kwargs):
-        for batch in tqdm(self.eval_dataset, desc="Evaluating", leave=False):
+        for batch in tqdm(
+            self.eval_dataset.iter(batch_size=self.eval_batch_size),
+            desc="Evaluating",
+            leave=False,
+        ):
             predictions = self.greedy_decode(batch["prompt"], self.max_new_tokens)
             completions = batch["completion"]
 
@@ -178,7 +213,11 @@ class GreedyEvaluation(TrainerCallback):
             ]
             accuracy = sum(correct) / len(correct)
 
-            logging.info(f"[Greedy Evaluation] accuracy: {accuracy}")
-            wandb.log({f"greedy_eval_acc_{self.wandb_group}": accuracy})
+            # log sample response
+            sample_idx = random.randint(0, len(predictions) - 1)
+            logging.info(f"sample prompt: {batch['prompt'][sample_idx]}")
+            logging.info(f"sample response: {predictions[sample_idx]}")
+            logging.info(f"sample completion: {completions[sample_idx]}")
+            wandb.log({f"eval/greedy_acc_{self.wandb_group}": accuracy})
 
         return control

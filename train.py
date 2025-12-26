@@ -248,6 +248,27 @@ def main(args):
         )
         trainer.add_callback(len_eval_greedy_evaluation)
 
+    # add summand number generalization evals
+    for num_operands in range(3, 5):
+        logging.info(
+            f"Sampling 1000 data points for summand number generalization evaluation with {num_operands} operands."
+        )
+        summand_num_eval_dataset = get_addition_eval_dataset_uniform(
+            args,
+            tokenizer,
+            k=args.dataset_pars.num_digits,
+            num_operands=num_operands,
+            num_samples=1000,
+        )
+        summand_num_eval_greedy_evaluation = GreedyEvaluation(
+            trainer,
+            tokenizer,
+            summand_num_eval_dataset,
+            wandb_group=str(num_operands),
+            max_new_tokens=16,
+        )
+        trainer.add_callback(summand_num_eval_greedy_evaluation)
+
     logging.info(
         f"Starting training on {args.model_pars.hf_model_id} using {args.method} (output dir {output_dir})."
     )

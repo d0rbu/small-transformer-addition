@@ -1,4 +1,6 @@
+import random
 from copy import deepcopy
+from math import comb
 
 import regex
 import torch as th
@@ -135,52 +137,59 @@ def get_finetuning_datasets(args, tokenizer) -> tuple[Dataset, Dataset]:
 
 
 class AdditionDataset:
-    def __init__(self, seed, tokenizer, k: int = 4):
+    def __init__(self, seed, tokenizer, k: int = 4, num_operands: int = 2):
         self.tokenizer = tokenizer
         self.seed = seed
         self.k = k
+        self.num_operands = num_operands
 
-    def _get_all_pairs(self) -> th.Tensor:
+    def _get_all_combinations(self) -> th.Tensor:
         start = 10 ** (self.k - 1)
         end = 10**self.k
         all_numbers = th.arange(start, end)
 
-        pairs = th.combinations(all_numbers, 2, with_replacement=True)
+        combinations = th.combinations(
+            all_numbers, self.num_operands, with_replacement=True
+        )
 
-        return pairs
+        return combinations
 
-    def _uniform_split_pairs(
+    def _uniform_split_combinations(
         self, seed: int, train_ratio: int | float
     ) -> tuple[th.Tensor, th.Tensor]:
         th.manual_seed(seed)
 
-        all_pairs = self._get_all_pairs()
-        num_pairs = all_pairs.shape[0]
+        all_combinations = self._get_all_combinations()
+        num_combinations = all_combinations.shape[0]
         if isinstance(train_ratio, float):
-            num_train_pairs = int(num_pairs * train_ratio)
+            num_train = int(num_combinations * train_ratio)
         else:
-            num_train_pairs = train_ratio
+            num_train = train_ratio
 
-        random_shuffle = th.randperm(num_pairs)
-        shuffled_pairs = all_pairs[random_shuffle]
+        random_shuffle = th.randperm(num_combinations)
+        shuffled_combinations = all_combinations[random_shuffle]
 
-        train_pairs = shuffled_pairs[:num_train_pairs]
-        test_pairs = shuffled_pairs[num_train_pairs:]
+        train_combinations = shuffled_combinations[:num_train]
+        test_combinations = shuffled_combinations[num_train:]
 
-        return train_pairs, test_pairs
+        return train_combinations, test_combinations
 
     def _format_solution(
         self, summands: th.Tensor, solution: th.Tensor, leading_zeroes: int = 0
     ) -> dict[str, str]:
-        first_summand = "0" * leading_zeroes + str(summands[0].item())
-        second_summand = "0" * leading_zeroes + str(summands[1].item())
+        # Convert all summands to strings with leading zeroes
+        summand_strs = ["0" * leading_zeroes + str(s.item()) for s in summands]
         solution_digits = str(solution.item())
 
+        # Build prompt by iterating through digit positions (reversed for right-to-left)
         prompt_parts = []
-        for first_summand_digit, second_summand_digit in zip(
-            reversed(first_summand), reversed(second_summand)
-        ):
-            prompt_parts.append(f"{first_summand_digit}+{second_summand_digit}|")
+        max_len = max(len(s) for s in summand_strs)
+        # Pad all summands to same length
+        summand_strs = [s.zfill(max_len) for s in summand_strs]
+
+        for digit_pos in range(max_len - 1, -1, -1):
+            digits_at_pos = [s[digit_pos] for s in summand_strs]
+            prompt_parts.append("+".join(digits_at_pos) + "|")
 
         prompt_parts.append("=")
 
@@ -192,36 +201,59 @@ class AdditionDataset:
             "completion": solution,
         }
 
-    def _format_pairs(self, pairs: th.Tensor) -> list[dict]:
-        solutions = pairs.sum(dim=1)
+    def _format_combinations(self, combinations: th.Tensor) -> list[dict]:
+        solutions = combinations.sum(dim=1)
         dataset_iterator = tqdm(
-            zip(pairs, solutions),
-            total=pairs.shape[0],
-            desc="Formatting pairs",
+            zip(combinations, solutions),
+            total=combinations.shape[0],
+            desc="Formatting combinations",
             leave=False,
         )
 
-        formatted_pairs = [
-            self._format_solution(pair, solution) for pair, solution in dataset_iterator
+        formatted = [
+            self._format_solution(combo, solution)
+            for combo, solution in dataset_iterator
         ]
 
-        return formatted_pairs
+        return formatted
 
     def generate_eval_data_uniform(self, num_samples: int) -> Dataset:
-        all_pairs = self._get_all_pairs()
-        num_pairs = all_pairs.shape[0]
+        random.seed(self.seed)
+        th.manual_seed(self.seed)
 
-        random_shuffle = th.randperm(num_pairs)
-        shuffled_pairs = all_pairs[random_shuffle]
-        eval_pairs = shuffled_pairs[:num_samples]
+        start = 10 ** (self.k - 1)
+        end = 10**self.k
+        n = end - start  # number of unique values
 
-        return Dataset.from_list(self._format_pairs(eval_pairs))
+        # For num_operands items with replacement: C(n + r - 1, r) where r = num_operands
+        # This is the multiset coefficient=
+        total_combinations = comb(n + self.num_operands - 1, self.num_operands)
+
+        num_samples_to_draw = min(num_samples, total_combinations)
+
+        # Sample random combinations uniformly
+        sampled_combinations = []
+        seen = set()
+        while len(sampled_combinations) < num_samples_to_draw:
+            # Generate a random combination with replacement (sorted for uniqueness)
+            combo = tuple(
+                sorted(random.choices(range(start, end), k=self.num_operands))
+            )
+            if combo not in seen:
+                seen.add(combo)
+                sampled_combinations.append(combo)
+
+        eval_combinations = th.tensor(sampled_combinations)
+
+        return Dataset.from_list(self._format_combinations(eval_combinations))
 
     def generate_data(self, train_ratio: int | float = 0.8) -> tuple[Dataset, Dataset]:
-        train_pairs, test_pairs = self._uniform_split_pairs(self.seed, train_ratio)
+        train_combos, test_combos = self._uniform_split_combinations(
+            self.seed, train_ratio
+        )
 
-        train_dataset = Dataset.from_list(self._format_pairs(train_pairs))
-        test_dataset = Dataset.from_list(self._format_pairs(test_pairs))
+        train_dataset = Dataset.from_list(self._format_combinations(train_combos))
+        test_dataset = Dataset.from_list(self._format_combinations(test_combos))
 
         return train_dataset, test_dataset
 
@@ -251,16 +283,16 @@ class AdditionDataset:
 
 
 def get_addition_datasets(
-    args, tokenizer, k: int = 4, train_ratio: int | float = 0.8
+    args, tokenizer, k: int = 4, num_operands: int = 2, train_ratio: int | float = 0.9
 ) -> tuple[Dataset, Dataset]:
-    return AdditionDataset(args.seed, tokenizer, k=k).generate_data(
-        train_ratio=train_ratio
-    )
+    return AdditionDataset(
+        args.seed, tokenizer, k=k, num_operands=num_operands
+    ).generate_data(train_ratio=train_ratio)
 
 
 def get_addition_eval_dataset_uniform(
-    args, tokenizer, k: int = 4, num_samples: int = 1000
+    args, tokenizer, k: int = 4, num_operands: int = 2, num_samples: int = 1000
 ) -> Dataset:
-    return AdditionDataset(args.seed, tokenizer, k=k).generate_eval_data_uniform(
-        num_samples
-    )
+    return AdditionDataset(
+        args.seed, tokenizer, k=k, num_operands=num_operands
+    ).generate_eval_data_uniform(num_samples)
