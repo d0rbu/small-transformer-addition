@@ -5,7 +5,7 @@ import random
 import torch
 from datasets import Dataset
 from tqdm import tqdm
-from transformers import TrainerCallback
+from transformers import TrainerCallback, TrainerState
 
 import wandb
 
@@ -131,6 +131,8 @@ class GreedyDecodeOnce(TrainerCallback):
 
 
 class GreedyEvaluation(TrainerCallback):
+    NUM_SAMPLES_TO_STORE = 3
+
     def __init__(
         self,
         trainer,
@@ -146,6 +148,9 @@ class GreedyEvaluation(TrainerCallback):
         self.max_new_tokens = max_new_tokens
         self.wandb_group = wandb_group
         self.eval_batch_size = eval_batch_size
+        self.eval_history = []
+        self.step_history = []
+        self.latest_samples = None
 
     @torch.no_grad()
     def greedy_decode(self, batch: list[str], max_new_tokens: int = 16) -> list[str]:
@@ -198,7 +203,10 @@ class GreedyEvaluation(TrainerCallback):
         ]
         return responses
 
-    def on_evaluate(self, args, state, control, **kwargs):
+    def on_evaluate(self, args, state: TrainerState, control, **kwargs):
+        total_eval_steps = 0
+        total_correct = 0
+
         for batch in tqdm(
             self.eval_dataset.iter(batch_size=self.eval_batch_size),
             desc="Evaluating",
@@ -211,13 +219,71 @@ class GreedyEvaluation(TrainerCallback):
                 prediction == completion
                 for prediction, completion in zip(predictions, completions, strict=True)
             ]
-            accuracy = sum(correct) / len(correct)
 
-            # log sample response
-            sample_idx = random.randint(0, len(predictions) - 1)
-            logging.info(f"sample prompt: {batch['prompt'][sample_idx]}")
-            logging.info(f"sample response: {predictions[sample_idx]}")
-            logging.info(f"sample completion: {completions[sample_idx]}")
-            wandb.log({f"eval/greedy_acc_{self.wandb_group}": accuracy})
+            total_eval_steps += len(correct)
+            total_correct += sum(correct)
+
+        accuracy = total_correct / total_eval_steps
+
+        # log sample response
+        sample_indices = random.sample(
+            range(len(predictions)), self.NUM_SAMPLES_TO_STORE
+        )
+        sample_idx_for_logging = sample_indices[0]
+        logging.info(f"sample prompt: {batch['prompt'][sample_idx_for_logging]}")
+        logging.info(f"sample response: {predictions[sample_idx_for_logging]}")
+        logging.info(f"sample completion: {completions[sample_idx_for_logging]}")
+        wandb.log({f"eval/greedy_acc_{self.wandb_group}": accuracy})
+
+        self.eval_history.append(accuracy)
+        self.step_history.append(state.global_step)
+
+        prompts = [batch["prompt"][i] for i in sample_indices]
+        responses = [predictions[i] for i in sample_indices]
+        completions = [completions[i] for i in sample_indices]
+        prompts_decoded = []
+        responses_decoded = []
+        completions_decoded = []
+        for prompt, response, completion in zip(
+            prompts, responses, completions, strict=True
+        ):
+            digit_sequences = prompt[:-2].split("|")
+            digit_sequences = [seq.split("+") for seq in digit_sequences]
+
+            summands_reversed = zip(*digit_sequences, strict=True)
+            summands = ["".join(summand[::-1]) for summand in summands_reversed]
+
+            prompt_decoded = " + ".join(summands)
+            prompt_decoded += " = "
+
+            response_reversed = "".join(response.split("|")).strip()
+            response_decoded = "".join(response_reversed[::-1])
+
+            completion_reversed = "".join(completion.split("|")).strip()
+            completion_decoded = "".join(completion_reversed[::-1])
+
+            prompts_decoded.append(prompt_decoded)
+            responses_decoded.append(response_decoded)
+            completions_decoded.append(completion_decoded)
+
+        self.latest_samples = [
+            {
+                "prompt": prompt,
+                "response": response,
+                "ground_truth": completion,
+                "prompt_decoded": prompt_decoded,
+                "response_decoded": response_decoded,
+                "ground_truth_decoded": completion_decoded,
+            }
+            for prompt, response, completion, prompt_decoded, response_decoded, completion_decoded in zip(
+                prompts,
+                responses,
+                completions,
+                prompts_decoded,
+                responses_decoded,
+                completions_decoded,
+                strict=True,
+            )
+        ]
 
         return control

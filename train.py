@@ -1,6 +1,8 @@
+import json
 import logging
 import os
 import random
+from dataclasses import dataclass
 
 import hydra
 import torch
@@ -84,6 +86,72 @@ def global_setup(args, wandb_run_id=None):
         run_name = wandb.run.name
 
     return run_id, run_name
+
+
+RESULTS_FILENAME = "results.json"
+
+
+@dataclass
+class LengthGeneralizationEval:
+    num_digits: int
+    callback: GreedyEvaluation
+
+
+@dataclass
+class SummandNumberGeneralizationEval:
+    num_operands: int
+    callback: GreedyEvaluation
+
+
+def get_results(
+    greedy_evaluation: GreedyEvaluation,
+    len_evals: list[LengthGeneralizationEval],
+    operand_evals: list[SummandNumberGeneralizationEval],
+) -> dict:
+    return {
+        "final_evals": {
+            "eval_set": {
+                "accuracy": greedy_evaluation.eval_history[-1],
+                "samples": greedy_evaluation.latest_samples,
+            },
+            "length_generalization": [
+                {
+                    "num_digits": eval.num_digits,
+                    "accuracy": eval.callback.eval_history[-1],
+                    "samples": eval.callback.latest_samples,
+                }
+                for eval in len_evals
+            ],
+            "summand_number_generalization": [
+                {
+                    "num_operands": eval.num_operands,
+                    "accuracy": eval.callback.eval_history[-1],
+                    "samples": eval.callback.latest_samples,
+                }
+                for eval in operand_evals
+            ],
+        },
+        "training_history": {
+            "eval_set": {
+                "accuracy": greedy_evaluation.eval_history,
+            },
+            "length_generalization": [
+                {
+                    "num_digits": eval.num_digits,
+                    "accuracy": eval.callback.eval_history,
+                }
+                for eval in len_evals
+            ],
+            "summand_number_generalization": [
+                {
+                    "num_operands": eval.num_operands,
+                    "accuracy": eval.callback.eval_history,
+                }
+                for eval in operand_evals
+            ],
+        },
+        "step_history": greedy_evaluation.step_history,
+    }
 
 
 @hydra.main(version_base=None, config_path="config", config_name="config")
@@ -228,6 +296,7 @@ def main(args):
     # add length generalization evals
     min_len_eval = max(args.dataset_pars.num_digits - 2, 1)
     max_len_eval = min(args.dataset_pars.num_digits + 2, 5)
+    len_evals = []
     for num_digits in range(min_len_eval, max_len_eval + 1):
         if num_digits == args.dataset_pars.num_digits:
             continue
@@ -248,7 +317,14 @@ def main(args):
         )
         trainer.add_callback(len_eval_greedy_evaluation)
 
+        len_evals.append(
+            LengthGeneralizationEval(
+                num_digits=num_digits, callback=len_eval_greedy_evaluation
+            )
+        )
+
     # add summand number generalization evals
+    operand_evals = []
     for num_operands in range(3, 5):
         logging.info(
             f"Sampling 1000 data points for summand number generalization evaluation with {num_operands} operands."
@@ -269,6 +345,12 @@ def main(args):
         )
         trainer.add_callback(summand_num_eval_greedy_evaluation)
 
+        operand_evals.append(
+            SummandNumberGeneralizationEval(
+                num_operands=num_operands, callback=summand_num_eval_greedy_evaluation
+            )
+        )
+
     logging.info(
         f"Starting training on {args.model_pars.hf_model_id} using {args.method} (output dir {output_dir})."
     )
@@ -279,6 +361,13 @@ def main(args):
             f"Resuming training from checkpoint at {model_dir} (output dir {output_dir})."
         )
         trainer.train(resume_from_checkpoint=model_dir)
+
+    # generate results.json
+    results = get_results(greedy_evaluation, len_evals, operand_evals)
+    with open(os.path.join(output_dir, RESULTS_FILENAME), "w") as f:
+        json.dump(results, f, indent=4)
+
+    logging.info(f"Results saved to {os.path.join(output_dir, RESULTS_FILENAME)}.")
 
 
 if __name__ == "__main__":

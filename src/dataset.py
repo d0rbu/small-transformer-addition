@@ -227,7 +227,7 @@ class AdditionDataset:
             combo = tuple(random.choices(range(start, end), k=self.num_operands))
             sampled_combinations.add(combo)
 
-        eval_combinations = th.tensor(sampled_combinations)
+        eval_combinations = th.tensor(list(sampled_combinations))
 
         return Dataset.from_list(self._format_combinations(eval_combinations))
 
