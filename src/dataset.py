@@ -176,7 +176,7 @@ class AdditionDataset:
     def _format_solution(
         self, summands: th.Tensor, solution: th.Tensor, leading_zeroes: int = 0
     ) -> dict[str, str]:
-        summand_strs = ["0" * leading_zeroes + str(s.item()) for s in summands]
+        summand_strs = [str(s.item())[::-1] + ("0" * leading_zeroes) for s in summands]
         solution_digits = str(solution.item())
 
         prompt_parts = []
@@ -187,7 +187,7 @@ class AdditionDataset:
         prompt_parts.append("=")
 
         prompt = "".join(prompt_parts)
-        solution = "|".join(solution_digits) + "|"
+        solution = "|".join(solution_digits[::-1]) + "|"
 
         return {
             "prompt": prompt,
@@ -217,10 +217,16 @@ class AdditionDataset:
 
         start = 10 ** (self.k - 1)
         end = 10**self.k
-        num_unique_values = end - start
+        num_unique_values = end - start + 1
 
         total_combinations = num_unique_values**self.num_operands
         num_samples_to_draw = min(num_samples, total_combinations)
+
+        if num_samples_to_draw == total_combinations:
+            eval_combinations = th.combinations(
+                th.arange(start, end), self.num_operands
+            )
+            return Dataset.from_list(self._format_combinations(eval_combinations))
 
         sampled_combinations = set()
         while len(sampled_combinations) < num_samples_to_draw:

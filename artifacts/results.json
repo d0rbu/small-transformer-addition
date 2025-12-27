@@ -1,0 +1,339 @@
+{
+    "final_evals": {
+        "eval_set": {
+            "accuracy": 0.9999260081391047,
+            "samples": [
+                {
+                    "prompt": "8+8|2+2|3+9|=",
+                    "response": "6|5|2|1|",
+                    "ground_truth": "6|5|2|1|",
+                    "prompt_decoded": "328 + 928 = ",
+                    "response_decoded": "1256",
+                    "ground_truth_decoded": "1256"
+                },
+                {
+                    "prompt": "4+6|6+7|1+1|=",
+                    "response": "0|4|3|",
+                    "ground_truth": "0|4|3|",
+                    "prompt_decoded": "164 + 176 = ",
+                    "response_decoded": "340",
+                    "ground_truth_decoded": "340"
+                },
+                {
+                    "prompt": "6+5|7+9|1+6|=",
+                    "response": "1|7|8|",
+                    "ground_truth": "1|7|8|",
+                    "prompt_decoded": "176 + 695 = ",
+                    "response_decoded": "871",
+                    "ground_truth_decoded": "871"
+                }
+            ]
+        },
+        "length_generalization": [
+            {
+                "num_digits": 1,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "1+4|=",
+                        "response": "5|2|3|",
+                        "ground_truth": "5|",
+                        "prompt_decoded": "1 + 4 = ",
+                        "response_decoded": "325",
+                        "ground_truth_decoded": "5"
+                    },
+                    {
+                        "prompt": "4+8|=",
+                        "response": "2|3|3|1|",
+                        "ground_truth": "2|1|",
+                        "prompt_decoded": "4 + 8 = ",
+                        "response_decoded": "1332",
+                        "ground_truth_decoded": "12"
+                    },
+                    {
+                        "prompt": "1+8|=",
+                        "response": "5|2|",
+                        "ground_truth": "9|",
+                        "prompt_decoded": "1 + 8 = ",
+                        "response_decoded": "25",
+                        "ground_truth_decoded": "9"
+                    }
+                ]
+            },
+            {
+                "num_digits": 2,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "2+5|3+1|=",
+                        "response": "5|7|7|3|9|",
+                        "ground_truth": "7|4|",
+                        "prompt_decoded": "32 + 15 = ",
+                        "response_decoded": "93775",
+                        "ground_truth_decoded": "47"
+                    },
+                    {
+                        "prompt": "8+8|6+3|=",
+                        "response": "5|1|5|1|0|",
+                        "ground_truth": "6|0|1|",
+                        "prompt_decoded": "68 + 38 = ",
+                        "response_decoded": "01515",
+                        "ground_truth_decoded": "106"
+                    },
+                    {
+                        "prompt": "3+5|1+1|=",
+                        "response": "5|8|0|9|9|",
+                        "ground_truth": "8|2|",
+                        "prompt_decoded": "13 + 15 = ",
+                        "response_decoded": "99085",
+                        "ground_truth_decoded": "28"
+                    }
+                ]
+            },
+            {
+                "num_digits": 4,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "3+3|3+2|7+8|3+4|=",
+                        "response": "9|1|",
+                        "ground_truth": "6|5|5|8|",
+                        "prompt_decoded": "3733 + 4823 = ",
+                        "response_decoded": "19",
+                        "ground_truth_decoded": "8556"
+                    },
+                    {
+                        "prompt": "7+0|2+8|5+8|4+6|=",
+                        "response": "9|1|",
+                        "ground_truth": "7|0|4|1|1|",
+                        "prompt_decoded": "4527 + 6880 = ",
+                        "response_decoded": "19",
+                        "ground_truth_decoded": "11407"
+                    },
+                    {
+                        "prompt": "7+1|3+1|6+7|7+3|=",
+                        "response": "9|1|",
+                        "ground_truth": "8|4|3|1|1|",
+                        "prompt_decoded": "7637 + 3711 = ",
+                        "response_decoded": "19",
+                        "ground_truth_decoded": "11348"
+                    }
+                ]
+            },
+            {
+                "num_digits": 5,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "5+4|7+7|3+9|2+8|4+8|=",
+                        "response": "",
+                        "ground_truth": "9|4|3|1|3|1|",
+                        "prompt_decoded": "42375 + 88974 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "131349"
+                    },
+                    {
+                        "prompt": "7+3|4+4|3+5|1+4|7+7|=",
+                        "response": "",
+                        "ground_truth": "0|9|8|5|4|1|",
+                        "prompt_decoded": "71347 + 74543 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "145890"
+                    },
+                    {
+                        "prompt": "8+7|2+2|0+5|8+1|9+3|=",
+                        "response": "",
+                        "ground_truth": "5|5|5|9|2|1|",
+                        "prompt_decoded": "98028 + 31527 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "129555"
+                    }
+                ]
+            }
+        ],
+        "summand_number_generalization": [
+            {
+                "num_operands": 3,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "8+9+3|7+2+9|7+2+4|=",
+                        "response": "3|1|",
+                        "ground_truth": "0|0|5|1|",
+                        "prompt_decoded": "778 + 229 + 493 = ",
+                        "response_decoded": "13",
+                        "ground_truth_decoded": "1500"
+                    },
+                    {
+                        "prompt": "4+0+7|4+5+5|4+8+2|=",
+                        "response": "4|1|",
+                        "ground_truth": "1|5|5|1|",
+                        "prompt_decoded": "444 + 850 + 257 = ",
+                        "response_decoded": "14",
+                        "ground_truth_decoded": "1551"
+                    },
+                    {
+                        "prompt": "8+3+1|0+0+0|9+8+1|=",
+                        "response": "1|1|",
+                        "ground_truth": "2|1|8|1|",
+                        "prompt_decoded": "908 + 803 + 101 = ",
+                        "response_decoded": "11",
+                        "ground_truth_decoded": "1812"
+                    }
+                ]
+            },
+            {
+                "num_operands": 4,
+                "accuracy": 0.0,
+                "samples": [
+                    {
+                        "prompt": "3+0+7+1|3+3+6+3|7+1+1+4|=",
+                        "response": "",
+                        "ground_truth": "1|6|4|1|",
+                        "prompt_decoded": "733 + 130 + 167 + 431 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "1461"
+                    },
+                    {
+                        "prompt": "4+6+7+0|3+7+5+8|3+1+6+7|=",
+                        "response": "",
+                        "ground_truth": "7|4|9|1|",
+                        "prompt_decoded": "334 + 176 + 657 + 780 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "1947"
+                    },
+                    {
+                        "prompt": "3+9+4+4|9+1+9+5|3+3+1+5|=",
+                        "response": "",
+                        "ground_truth": "0|6|4|1|",
+                        "prompt_decoded": "393 + 319 + 194 + 554 = ",
+                        "response_decoded": "",
+                        "ground_truth_decoded": "1460"
+                    }
+                ]
+            }
+        ]
+    },
+    "training_history": {
+        "eval_set": {
+            "accuracy": [
+                0.9412257984954988,
+                0.9978542360340362,
+                0.9995067209273647,
+                0.9998766802318412,
+                0.9999260081391047,
+                0.9999013441854729,
+                0.9999013441854729,
+                0.9999013441854729,
+                0.9999260081391047,
+                0.9999260081391047
+            ]
+        },
+        "length_generalization": [
+            {
+                "num_digits": 1,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            {
+                "num_digits": 2,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            {
+                "num_digits": 4,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            {
+                "num_digits": 5,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            }
+        ],
+        "summand_number_generalization": [
+            {
+                "num_operands": 3,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            {
+                "num_operands": 4,
+                "accuracy": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            }
+        ]
+    },
+    "step_history": [
+        182,
+        364,
+        546,
+        728,
+        910,
+        1092,
+        1274,
+        1456,
+        1638,
+        1820
+    ]
+}

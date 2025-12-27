@@ -9,3 +9,9 @@ wandb login
 
 uv run python train.py +experiment=scratch
 ```
+
+Previous iterations of hyperparameters are in `config/experiment`.
+
+The data and figures from the final run are copied in `artifacts`, including `results.json`.
+
+The code for generating the dataset is in `src/dataset.py` and the code for running evaluations in split between `src/huggingface_callbacks.py` and `train.py`.
