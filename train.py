@@ -5,6 +5,7 @@ import random
 from dataclasses import dataclass
 
 import hydra
+import matplotlib.pyplot as plt
 import torch
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
@@ -111,8 +112,8 @@ def get_results(
     return {
         "final_evals": {
             "eval_set": {
-                "accuracy": greedy_evaluation.eval_history[-1],
-                "samples": greedy_evaluation.latest_samples,
+                "accuracy": greedy_evaluation.callback.eval_history[-1],
+                "samples": greedy_evaluation.callback.latest_samples,
             },
             "length_generalization": [
                 {
@@ -133,7 +134,7 @@ def get_results(
         },
         "training_history": {
             "eval_set": {
-                "accuracy": greedy_evaluation.eval_history,
+                "accuracy": greedy_evaluation.callback.eval_history,
             },
             "length_generalization": [
                 {
@@ -296,7 +297,7 @@ def main(args):
     # add length generalization evals
     min_len_eval = max(args.dataset_pars.num_digits - 2, 1)
     max_len_eval = min(args.dataset_pars.num_digits + 2, 5)
-    len_evals = []
+    len_evals: list[LengthGeneralizationEval] = []
     for num_digits in range(min_len_eval, max_len_eval + 1):
         if num_digits == args.dataset_pars.num_digits:
             continue
@@ -324,7 +325,7 @@ def main(args):
         )
 
     # add summand number generalization evals
-    operand_evals = []
+    operand_evals: list[SummandNumberGeneralizationEval] = []
     for num_operands in range(3, 5):
         logging.info(
             f"Sampling 1000 data points for summand number generalization evaluation with {num_operands} operands."
@@ -368,6 +369,40 @@ def main(args):
         json.dump(results, f, indent=4)
 
     logging.info(f"Results saved to {os.path.join(output_dir, RESULTS_FILENAME)}.")
+
+    # plotting main evaluation, length generalization, and summand number generalization
+    plt.plot(
+        greedy_evaluation.callback.step_history, greedy_evaluation.callback.eval_history
+    )
+    plt.xlabel("Step")
+    plt.ylabel("Accuracy")
+    plt.title("Eval Set Accuracy")
+    plt.savefig(os.path.join(output_dir, "main_evaluation_plot.png"))
+    plt.close()
+
+    len_eval_legend = []
+    for len_eval in len_evals:
+        len_eval_legend.append(f"{len_eval.num_digits} digits")
+        plt.plot(len_eval.callback.step_history, len_eval.callback.eval_history)
+
+    plt.legend(len_eval_legend)
+    plt.xlabel("Step")
+    plt.ylabel("Accuracy")
+    plt.title("Length Generalization Accuracy")
+    plt.savefig(os.path.join(output_dir, "length_generalization_plot.png"))
+    plt.close()
+
+    operand_eval_legend = []
+    for operand_eval in operand_evals:
+        operand_eval_legend.append(f"{operand_eval.num_operands} summands")
+        plt.plot(operand_eval.callback.step_history, operand_eval.callback.eval_history)
+
+    plt.legend(operand_eval_legend)
+    plt.xlabel("Step")
+    plt.ylabel("Accuracy")
+    plt.title("Summand Number Generalization Accuracy")
+    plt.savefig(os.path.join(output_dir, "summand_number_generalization_plot.png"))
+    plt.close()
 
 
 if __name__ == "__main__":
