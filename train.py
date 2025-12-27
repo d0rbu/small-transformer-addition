@@ -112,8 +112,8 @@ def get_results(
     return {
         "final_evals": {
             "eval_set": {
-                "accuracy": greedy_evaluation.callback.eval_history[-1],
-                "samples": greedy_evaluation.callback.latest_samples,
+                "accuracy": greedy_evaluation.eval_history[-1],
+                "samples": greedy_evaluation.latest_samples,
             },
             "length_generalization": [
                 {
@@ -134,7 +134,7 @@ def get_results(
         },
         "training_history": {
             "eval_set": {
-                "accuracy": greedy_evaluation.callback.eval_history,
+                "accuracy": greedy_evaluation.eval_history,
             },
             "length_generalization": [
                 {
@@ -371,9 +371,7 @@ def main(args):
     logging.info(f"Results saved to {os.path.join(output_dir, RESULTS_FILENAME)}.")
 
     # plotting main evaluation, length generalization, and summand number generalization
-    plt.plot(
-        greedy_evaluation.callback.step_history, greedy_evaluation.callback.eval_history
-    )
+    plt.plot(greedy_evaluation.step_history, greedy_evaluation.eval_history)
     plt.xlabel("Step")
     plt.ylabel("Accuracy")
     plt.title("Eval Set Accuracy")
